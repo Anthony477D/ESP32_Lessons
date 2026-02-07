@@ -120,6 +120,8 @@ void loop() {
   Serial.printf("\n HelloWorld");
   delay(500);
 
+
+  /* вівід в термінал значень потенціометра
   potvalue = analogRead(PINPOTENC);
   voltage = (potvalue * POT_VOLTAGE_MAX) / POTRANGE_MAX;
 
@@ -127,8 +129,9 @@ void loop() {
   Serial.print(potvalue);
   Serial.print(" | Напруга: ");
   Serial.println(voltage);
+  */
 
-  /*
+  /* керування яскравістю світлодіолів
   for (int i = 0; i <= 255; i++) {
     //ledcWrite(CH1, i);
     LedBlue(i);
