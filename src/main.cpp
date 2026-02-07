@@ -59,6 +59,14 @@ potvalue -> 2000 - 4100 (значення мінімума та максимум
 #define CUCLE 25  // кількіість ітерацій виміру ADC для середнього значення
 
 
+//_________________________________________________________________________________________________________
+//                      створення дефайнів для кнопки 
+#define BUTTON 2
+#define MISTKLICK 50
+
+
+
+
 //*********************************************************************************************************
 /*
 Ініціюємо функції для простого керування яскравістю світлодіода де ми задаємо лише скважність, а канал та
@@ -73,6 +81,14 @@ void LedBlue (int);
 int PotControl (void);
 
 
+bool flag = false;
+int MARKER = 1;
+
+
+void IRAM_ATTR ButtonPress(){
+  flag = true;
+  Serial.printf("\n переривання");
+}
 
 
 //*********************************************************************************************************
@@ -106,6 +122,10 @@ void setup() {
   // виставляємо атенюатор ADC на 6db, це дозволить працювати з лініжю 1.8 вольта на максимальному діапазоні ADC
   analogSetAttenuation(ADC_6db); 
 
+
+  pinMode(BUTTON,INPUT);
+  attachInterrupt(digitalPinToInterrupt(BUTTON), ButtonPress, FALLING);
+
 }
 
 
@@ -115,17 +135,51 @@ void setup() {
 
 
 
+bool first = false;
+bool second = false;
 //*********************************************************************************************************
 void loop() {
-  Serial.printf("\n HelloWorld\n");
-  delay(500);
+  //Serial.printf("\n Маркер == ");
+  //Serial.print(MARKER);
+  //Serial.printf("\n");
+  //delay(500);
+  
+  if(flag == true){
+    Serial.printf("\n if прапру");
+    flag = false;
 
-  //PotControl();  // функція повертає знаячення скважності PWM 0 - 255 для керуванням LED
+    first = digitalRead(BUTTON); // значення відразу після маркера
+    delay(MISTKLICK);  // час затримки для перевірки зибного натиску
+    second = digitalRead(BUTTON); // значення після затримки
+
+    if(first == second){  
+      MARKER++;
+      Serial.printf("\n if маркеру");
+    }
+
+  }
+
+  
+
+  
 
 
 
+  if(MARKER == 1){
+    LedBlue(PotControl());
+  }
 
+  if(MARKER == 2){
   LedGreen(PotControl());
+  }
+  
+  if(MARKER == 3){
+    LedRed(PotControl());
+  }
+
+  if(MARKER >= 4){
+    MARKER = 1;
+  }
 
 }
 
@@ -172,7 +226,7 @@ int led_range_coef = (POTRANGE_MAX - POTRANGE_MIN) / 255 ; // коеціцієн
   int potval_led = ((pottrue - POTRANGE_MIN) / led_range_coef)-FLOATZERO;
 
   // test row
-  Serial.print(potval_led);
+  //Serial.print(potval_led);
 
   return potval_led;
 
