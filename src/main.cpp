@@ -23,21 +23,73 @@
 //*********************************************************************************************************
 #include <Arduino.h>
 
-// Clear project from new lessons created on bace platform in arduino
+//_________________________________________________________________________________________________________
+/*
+створення дефайнів для керування світлододдами
+- призначкння піна під світлодіод
+- створення каналу, щоб керувати гими окремо
+- створення дефайнів з частотою та лмскритизацією сквадності ШІМ (8 біт -> від 0 до 255)
+*/ 
+#define LED_GREEN 4 
+#define LED_RED 6
+#define LED_BLUE 5
 
-// put function declarations here:
-int myFunction(int, int);
+#define CH1 0
+#define CH2 1
+#define CH3 2
 
+#define FREQ 5000
+#define RESOL 8
+//_________________________________________________________________________________________________________
+
+//*********************************************************************************************************
+/*
+Ініціюємо функції для простого керування яскравістю світлодіода
+*/
+void LedGreen (int resol);
+//*********************************************************************************************************
 void setup() {
+  /*
   // put your setup code here, to run once:
   int result = myFunction(2, 3);
+  */
+ ledcSetup(CH1,FREQ,RESOL);
+ ledcSetup(CH2,FREQ,RESOL);
+ ledcSetup(CH3,FREQ,RESOL);
+
+ ledcAttachPin(LED_GREEN,CH1);
+ ledcAttachPin(LED_BLUE,CH2);
+ ledcAttachPin(LED_RED,CH3);
+  
 }
 
+//*********************************************************************************************************
 void loop() {
   // put your main code here, to run repeatedly:
+
+  for (int i = 0; i <= 255; i++) {
+    ledcWrite(CH1, i);
+    delay(50);
+  }
+  for (int i = 0; i <= 255; i++) {
+    ledcWrite(CH2, i);
+    delay(50);
+  }
+  for (int i = 0; i <= 255; i++) {
+    ledcWrite(CH3, i);
+    delay(50);
+  }
+
 }
 
+//*********************************************************************************************************
+/*
 // put function definitions here:
 int myFunction(int x, int y) {
   return x + y;
+}
+*/
+
+void LedGreen (int resol){
+  ledcWrite(CH1, resol);
 }
