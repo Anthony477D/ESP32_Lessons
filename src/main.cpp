@@ -66,6 +66,12 @@ potvalue -> 2000 - 4100 (значення мінімума та максимум
 
 
 
+//_________________________________________________________________________________________________________
+//                      створення дефайнів для виміру напруги через adc
+#define VOLTAGE_SENS_1 15
+#define VOLTAGE_SENS_2 16
+#define VOLTAGE_SENS_3 17
+
 
 //*********************************************************************************************************
 /*
@@ -120,8 +126,15 @@ void setup() {
 
   analogReadResolution(12); // виставляжмо розширення ADC 0-4095 
   // виставляємо атенюатор ADC на 6db, це дозволить працювати з лініжю 1.8 вольта на максимальному діапазоні ADC
-  analogSetAttenuation(ADC_6db); 
+  //analogSetAttenuation(ADC_6db); 
+  // встановлення атенюатора на конкретному піні
+  analogSetPinAttenuation(PINPOTENC,ADC_6db);
 
+
+  // встановлення значення атенюатора для пінів виміру напруги до 3.3 вольт
+  analogSetPinAttenuation(VOLTAGE_SENS_1, ADC_11db);
+  analogSetPinAttenuation(VOLTAGE_SENS_2, ADC_11db);
+  analogSetPinAttenuation(VOLTAGE_SENS_3, ADC_11db);
 
   pinMode(BUTTON,INPUT);
   attachInterrupt(digitalPinToInterrupt(BUTTON), ButtonPress, FALLING);
@@ -144,6 +157,41 @@ void loop() {
   //Serial.printf("\n");
   //delay(500);
   
+  float milivotl = 0;
+  float voltage = 0;
+  //red
+  milivotl = analogReadMilliVolts(VOLTAGE_SENS_2);
+  voltage = milivotl / 1000;
+
+  // вивід значень або в термінал абл в teleplot
+  Serial.print(">Voltage_red:");
+  Serial.println(voltage);
+  //Serial.printf("\nRED-> ");
+  //Serial.print(voltage);
+
+  milivotl = analogReadMilliVolts(VOLTAGE_SENS_1);
+  voltage = milivotl / 1000;
+
+  // вивід значень або в термінал абл в teleplot
+  Serial.print(">Voltage_green:");
+  Serial.println(voltage);
+  //Serial.printf(" ____GREEN-> ");
+  //Serial.print(voltage);
+
+  milivotl = analogReadMilliVolts(VOLTAGE_SENS_3);
+  voltage = milivotl / 1000;
+
+  // вивід значень або в термінал абл в teleplot
+  Serial.print(">Voltage_blue:");
+  Serial.println(voltage);
+  //Serial.printf("_____BLUE-> ");
+  //Serial.print(voltage);
+
+  
+
+
+
+  // перевірка переривання на кнопці та реалізація затримки від хибного спрацювання
   if(flag == true){
     Serial.printf("\n if прапру");
     flag = false;
@@ -159,26 +207,23 @@ void loop() {
 
   }
 
-  
 
-  
-
-
-
-  if(MARKER == 1){
+  // вибір контролюємого леда та встановлення значення скважності його ШІМ
+  switch (MARKER)
+  {
+  case 1:
+    /* code */
     LedBlue(PotControl());
-  }
-
-  if(MARKER == 2){
-  LedGreen(PotControl());
-  }
-  
-  if(MARKER == 3){
+    break;
+  case 2:
+    LedGreen(PotControl());
+    break;
+  case 3:
     LedRed(PotControl());
-  }
-
-  if(MARKER >= 4){
+    break;
+  default:
     MARKER = 1;
+    break;
   }
 
 }
