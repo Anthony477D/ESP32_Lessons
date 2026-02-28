@@ -1,6 +1,12 @@
 #include <Arduino.h>
 
 // Clear project from new lessons created on bace platform in arduino
+/*
+Домашня робота по освоєнню C++ та робота з світлодіодом на основі методів, обєктів та класів
+
+*/
+
+
 
 // put function declarations here:
 int myFunction(int, int);
