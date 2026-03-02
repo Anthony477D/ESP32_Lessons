@@ -126,6 +126,9 @@ void loop() {
     Serial.println(test);
     Serial.println(test1);
 
+    delay(500);
+    digitalWrite(SIGNAL, LOW);
+
   }else{
    // digitalWrite(SIGNAL, LOW);
     //Serial.println(test);
