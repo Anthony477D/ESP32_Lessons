@@ -1,13 +1,13 @@
 /*
-заміряти значення спрацювання реле, як на позицію ON так і на позицію OFF
-Виміряти час перемикання реле з пощмції ON в OFF між відповідними виводами
+Створюємо програмний PWM але замість керування частоти блимання окремих світлодіодів куруємо кольорами RGB світлодіода
+кожен PWM канал керує окремим кольором. Значення задаються з терміналу у відсотках скважності 0-100
 */
 
 #include <Arduino.h>
 
-#define SIGNAL 12
-#define RIGHT_SENS 17
-#define LEFT_SENS 18
+#define LED_RED 16
+#define LED_GREEN 17
+#define LED_BLUE 18
 
 volatile uint32_t RelayOff = 0;
 volatile uint32_t RelayOn = 0;
@@ -78,92 +78,105 @@ uint32_t CounterTimeMashine::ReturnCounterMC = 0;
 
 CounterTimeMashine C_T_M_;
 
+
+class SoftPWM{
+  private:
+    uint8_t _PWMpin; 
+    uint16_t _range;  
+    uint16_t _segment;
+    
+    bool _setzero; // маркер який вказує що діпазон модуляції закінчився
+
+    uint32_t _time_zero;  // нульова точка відліку часу
+    uint32_t _time_count_external; // на майбутнє, cюди модна привязати фунецію часу та вибирати між мілісек та мікросек
+
+    uint32_t _segment_time; // час за який модулюється один сегмент PWM сигналу
+    uint16_t _countSegmentON; // кількість сегментів які маєть бути в положенні HIGH
+
+    uint32_t _timePWM_HIGH; 
+
+
+
+  /*    налаштовуємо PWM на піні
+  PWMpin  ->  вказуємо який пін буде використаний для генерації PWM
+  range   ->  параметер що зажає дрвжину модуляції PWM в мс
+  segment ->  параметер, що задає на скільки сегментів буде розбитий відрізок PWM  
+  */ 
+  void setPin(uint8_t PWMpin, uint16_t range, uint16_t segment){
+    _PWMpin = PWMpin;
+    _range = range;
+    _segment = segment;
+    pinMode(_PWMpin, OUTPUT);
+
+    // розраховуємо час одного сегменту модуляції
+    _segment_time = _range / _segment;
+
+  }
+
+  void PWM_Main(uint8_t duty){
+    //****************************************************************************************************************** 
+    // якщо час перілду модуляцї вийшов скидуємо внутріщній таймер в 0 для наступног нового періоду
+    if( _setzero == true){
+      _time_zero = millis();
+      _setzero = false;
+    }
+
+
+    //****************************************************************************************************************** 
+    // рохраховуємо скільки цілих сегментів мають положення HIGH
+    /*
+    кількість_сегментів_HIGH = ( загальна_кількість_сегментів / 100_відсотків) * відсоткове_значення_PWM_в_положенні_HIGH 
+    */
+    _countSegmentON = (_segment/100) * duty;
+
+    // маючи кількість сегментів та час одного з них, вираховужмо час який потрібно тпимати HIGH
+    _timePWM_HIGH = _countSegmentON * _segment_time; 
+
+    // якщо час який потрібно давати HIGH менший за пройдений час від початку періоду, пін в полоденні HIGH
+    if( _timePWM_HIGH < (millis() - _range)){
+      digitalWrite(_PWMpin, HIGH);
+    }else{
+      digitalWrite(_PWMpin, LOW);
+    }
+
+
+
+
+    //****************************************************************************************************************** 
+    /* перевірка чи не вичирпався період модуляції
+    (фактичний_час_опорного_нуля + час_періоду_модуляції_PWM)
+                          >=
+    (фактичний_час_зовнішнього_таймера - час_встановлений_за_нульова_точку_відліку)
+    *///якщо вичерпався ставимо марек для скидання нульової точки відліку часу
+    if( (_time_zero + _range) >= (millis() - _time_zero)){
+      _setzero = true;
+    }
+
+  }
+
+};
+
 /*
 створюємо переривання де фіксуємо час коли спрацювання а нуль виставляємо власноруч
 */
-void IRAM_ATTR RightSensorInterapt(){
-  RelayOn = C_T_M_.MCRcountMashin();
-}
-void IRAM_ATTR LeftSensorInterapt(){
-  RelayOff = C_T_M_.MCRcountMashin();
-}
+
 
 
 void setup() {
   
   Serial.begin(115200); // Додаємо монітор порту для діагностики та виводу інформації
   
-  pinMode(SIGNAL, OUTPUT); // config relay control pin
+  pinMode(LED_BLUE, OUTPUT); // config relay control pin
+  pinMode(LED_GREEN, OUTPUT); 
+  pinMode(LED_RED,OUTPUT);
 
-  pinMode(RIGHT_SENS, INPUT_PULLDOWN);  // config relay read pin ON mode 
-  pinMode(LEFT_SENS, INPUT_PULLDOWN);   // config relay read pin OFF mode
-
-  attachInterrupt(digitalPinToInterrupt(RIGHT_SENS), RightSensorInterapt, RISING);
-  attachInterrupt(digitalPinToInterrupt(LEFT_SENS), LeftSensorInterapt, RISING);
 }
 
 
-bool dataReady = false; // Flag to resive any terminal data
-uint8_t StateStatus = 1; // relay mode flag ON/OFF
 
-uint32_t deltaON = 0;
-uint32_t deltaOFF = 0;
-uint32_t deltaLocal = 0;
-bool flagON = false;
-bool flagOFF = false;
 
 void loop() {
 
-  // set zero pint CounterMashine to zero
-  C_T_M_.setZeroMC();
-  
-  // read data in terminal; When we have the bool is TRUE, esle nothing data the bool is FALSE
-  dataReady = terminal.ReadInput();
-  
-
-  // detect and meas relay switch ON
-  if(dataReady == true && StateStatus == 1){
-    
-    digitalWrite(SIGNAL, HIGH);
-
-    Serial.printf("Time to ON   relay -> ");
-    Serial.printf("%d",RelayOn);
-    Serial.printf(" micro_sec\n");
-
-    StateStatus = 2;
-    dataReady = false;
-
-    deltaOFF = RelayOff;
-    flagOFF = true;
-  }
-
-  // detect and meas relay switch OFF
-  if(dataReady == true && StateStatus == 2){
-    digitalWrite(SIGNAL, LOW);
-
-    Serial.printf("Time to OFF relay -> ");
-    Serial.printf("%d",RelayOff);
-    Serial.printf(" micro_sec\n");
-
-    StateStatus = 1;
-    dataReady = false;
-
-    deltaON= RelayOn;
-    flagON = true;
-  }
-
-  // meas delta time between relay position
-  if(flagOFF == true && flagON == true){
-    deltaLocal = deltaOFF + deltaON;
-    flagOFF = false;
-    flagON = false;
-    Serial.printf("Час між режимом ON та OFF -> ");
-    Serial.printf("%d\n\n",deltaLocal);
-  }
-  
-
-
- 
 }
 
 
