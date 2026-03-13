@@ -95,7 +95,9 @@ class SoftPWM{
 
     uint32_t _timePWM_HIGH; 
 
+    //volatile uint32_t _time_core = millis();
 
+  public: // без цього всі функції класу стають приватними(
 
   /*    налаштовуємо PWM на піні
   PWMpin  ->  вказуємо який пін буде використаний для генерації PWM
@@ -113,11 +115,36 @@ class SoftPWM{
 
   }
 
+  void PWM_Update(){
+
+     if( _timePWM_HIGH < (micros() - _time_zero + _segment_time)){
+      digitalWrite(_PWMpin, LOW);
+    }else{
+      digitalWrite(_PWMpin, HIGH);
+    }
+    //millis; 
+
+    if( _setzero == true){
+      _time_zero = micros();
+      _setzero = false;
+    }
+
+    if( _range <= (micros() - _time_zero)){
+      _setzero = true;
+    }
+
+
+   
+
+    
+  }
+
   void PWM_Main(uint8_t duty){
     //****************************************************************************************************************** 
     // якщо час періоду модуляції вийшов скидуємо внутріщній таймер в 0 для наступного нового періоду
+    
     if( _setzero == true){
-      _time_zero = millis();
+      _time_zero = micros();
       _setzero = false;
     }
 
@@ -127,13 +154,13 @@ class SoftPWM{
     /*
     кількість_сегментів_HIGH = ( загальна_кількість_сегментів / 100_відсотків) * відсоткове_значення_PWM_в_положенні_HIGH 
     */
-    _countSegmentON = (_segment/100) * duty;
+    _countSegmentON = (_segment*duty) / 100;
 
     // маючи кількість сегментів та час одного з них, вираховужмо час який потрібно тпимати HIGH
     _timePWM_HIGH = _countSegmentON * _segment_time; 
 
     // якщо час який потрібно давати HIGH менший за пройдений час від початку періоду, пін в положенні HIGH
-    if( _timePWM_HIGH < (millis() - _time_zero)){
+    if( _timePWM_HIGH < (micros() - _time_zero)){
       digitalWrite(_PWMpin, HIGH);
     }else{
       digitalWrite(_PWMpin, LOW);
@@ -148,7 +175,7 @@ class SoftPWM{
                           >=
     (фактичний_час_зовнішнього_таймера - час_встановлений_за_нульову_точку_відліку)
     *///якщо вичерпався ставимо маркер для скидання нульової точки відліку часу
-    if( _range <= (millis() - _time_zero)){
+    if( _range <= (micros() - _time_zero)){
       _setzero = true;
     }
 
@@ -160,6 +187,7 @@ class SoftPWM{
 створюємо переривання де фіксуємо час коли спрацювання а нуль виставляємо власноруч
 */
 
+SoftPWM RGB_LedGreen;
 
 
 void setup() {
@@ -170,13 +198,73 @@ void setup() {
   pinMode(LED_GREEN, OUTPUT); 
   pinMode(LED_RED,OUTPUT);
 
+  RGB_LedGreen.setPin(LED_GREEN, 1000, 50);
+
 }
 
 
-
+bool flag = true;
 
 void loop() {
 
+  if(flag == true){
+
+    flag = false;
+    RGB_LedGreen.PWM_Main(50);
+  }
+
+  RGB_LedGreen.PWM_Update();
+  
+  //digitalWrite(LED_BLUE, HIGH);
+  //delay(250);
+  //digitalWrite(LED_BLUE, LOW);
+  //delay(250);
+  //Serial.printf("I am loop");
 }
 
 
+class corectPWM{
+  private:
+  uint8_t _PWMFreq; // частота ШІМ сигналу в герцах. Максимум 255Гц, це дасть ширину фрагмента в 3.9 мілісекунди
+  uint8_t _PWMPin;
+
+  uint32_t _timeSegment; // час одного фрейму PWM сигналу
+  uint32_t _UPPWMTime;
+
+  public:
+    
+  void init_PWM(uint8_t PinGPIO,uint8_t FreqPWM){
+    // запис вхідних данниї в обєкт класу для подальщої роботи
+    _PWMPin = PinGPIO;
+    _PWMFreq = FreqPWM; // частота до 255Гц
+
+    // ініціалізація піна, та всталовлення його в режим LOW
+    pinMode(_PWMPin, OUTPUT);
+    digitalWrite(_PWMPin,LOW);
+
+    // розрахунок часу тривалорсті одного фрейму PWM сигналу
+    uint32_t onesecond = 1000000; // значення однієї секунди в тактах для нашої опорної частоти
+    _timeSegment = onesecond / _PWMFreq;
+  }
+
+  // для збільшення чутливості, duty задається в форматі цілого числа, але з сотою частиною відсотка
+  // 1% -> 100 / 5% -> 500 / 30% -> 3000 / 100% -> 10000
+  // це дозволяє на порядок збільшити чутливість PWM, а int формат - задає простоту розрахунків відносно float
+  void update_soft_PWM(uint16_t duty){
+    _UPPWMTime = (_timeSegment * duty) / 10000; // розраховуємо час тривалості логічної 1 в PWM фреймі
+  }
+
+  // для не тревіальних завдань, значкння в відсотках від 1 - 100
+  void update_hard_PWM(uint8_t duty){
+    _UPPWMTime = (_timeSegment * duty) / 100; // розраховуємо час тривалості логічної 1 в PWM фреймі
+  }
+
+  void PWMmain(){
+    
+  }
+
+  
+
+  
+
+};
