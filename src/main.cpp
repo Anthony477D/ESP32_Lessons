@@ -5,9 +5,9 @@
 
 #include <Arduino.h>
 
-#define LED_RED 16
+#define LED_RED 18
 #define LED_GREEN 17
-#define LED_BLUE 18
+#define LED_BLUE 16
 
 class corectPWM{
   private:
@@ -17,10 +17,11 @@ class corectPWM{
   uint32_t _timeSegment; // час одного фрейму PWM сигналу
   uint32_t _UPPWMTime;
 
-  bool _flag = false;
-  bool _lastPosition = false;
+  bool _flag;
+  bool _lastPosition;
 
   uint32_t _zeroPoint;
+  uint32_t _curentTime;
 
   public:
     
@@ -36,6 +37,9 @@ class corectPWM{
     // розрахунок часу тривалорсті одного фрейму PWM сигналу
     uint32_t onesecond = 1000000; // значення однієї секунди в тактах для нашої опорної частоти
     _timeSegment = onesecond / _PWMFreq;
+
+    _flag = false;
+    _lastPosition = false;
   }
 
   // для збільшення чутливості, duty задається в форматі цілого числа, але з сотою частиною відсотка
@@ -54,17 +58,17 @@ class corectPWM{
 
   // основний цикл модуляції ШИМ
   void PWMmain(){
-
+    _curentTime = micros();
     // перевірка лічильника фрейма
     // якщо нульова точка + час фреймк >= за фактичний час то перезаписуємо час нульової точки
-    if( (_zeroPoint + _timeSegment) >= micros() ){
-      _zeroPoint = micros();
+    if( (_curentTime - _zeroPoint) >= _timeSegment ){
+      _zeroPoint = _curentTime;
     }
 
     // перевірка лічильника високого рівня фрейму
     // якщо нуль + час високого рівня < таймера ставимо маркер на підняття рівня
     // якщо менше -> маркер на зменшення рівня
-    if( (_zeroPoint + _UPPWMTime) <= micros() ){
+    if( (_curentTime - _zeroPoint) <= _UPPWMTime ){
       _flag = true;
     }else{
       _flag = false;
@@ -90,25 +94,34 @@ class corectPWM{
 
 };
 
+corectPWM ledRed;
+corectPWM ledGreen;
+corectPWM ledBlue;
 
 
 void setup() {
   
   Serial.begin(115200); // Додаємо монітор порту для діагностики та виводу інформації
   
-  pinMode(LED_BLUE, OUTPUT); // config relay control pin
-  pinMode(LED_GREEN, OUTPUT); 
-  pinMode(LED_RED,OUTPUT);
+  ledRed.init_PWM(LED_RED,100);
+  ledBlue.init_PWM(LED_BLUE,100);
+  ledGreen.init_PWM(LED_GREEN,100);
 
-  
 
+
+  ledRed.update_hard_PWM(10);
+  ledBlue.update_hard_PWM(90);
+  ledGreen.update_hard_PWM(10);
 }
 
 
-
+int flag = false;
 void loop() {
 
   
+  ledRed.PWMmain();
+  ledBlue.PWMmain();
+  ledGreen.PWMmain();
   
   //digitalWrite(LED_BLUE, HIGH);
   //delay(250);
