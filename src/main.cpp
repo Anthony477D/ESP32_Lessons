@@ -231,6 +231,11 @@ class corectPWM{
   uint32_t _timeSegment; // час одного фрейму PWM сигналу
   uint32_t _UPPWMTime;
 
+  bool _flag = false;
+  bool _lastPosition = false;
+
+  uint32_t _zeroPoint;
+
   public:
     
   void init_PWM(uint8_t PinGPIO,uint8_t FreqPWM){
@@ -252,15 +257,48 @@ class corectPWM{
   // це дозволяє на порядок збільшити чутливість PWM, а int формат - задає простоту розрахунків відносно float
   void update_soft_PWM(uint16_t duty){
     _UPPWMTime = (_timeSegment * duty) / 10000; // розраховуємо час тривалості логічної 1 в PWM фреймі
+    _zeroPoint = micros(); 
   }
 
   // для не тревіальних завдань, значкння в відсотках від 1 - 100
   void update_hard_PWM(uint8_t duty){
     _UPPWMTime = (_timeSegment * duty) / 100; // розраховуємо час тривалості логічної 1 в PWM фреймі
+    _zeroPoint = micros(); 
   }
 
   void PWMmain(){
-    
+
+    // перевірка лічильника фрейма
+    // якщо нульова точка + час фреймк >= за фактичний час то перезаписуємо час нульової точки
+    if( (_zeroPoint + _timeSegment) >= micros() ){
+      _zeroPoint = micros();
+    }
+
+    // перевірка лічильника високого рівня фрейму
+    // якщо нуль + час високого рівня < таймера ставимо маркер на підняття рівня
+    // якщо менше -> маркер на зменшення рівня
+    if( (_zeroPoint + _UPPWMTime) <= micros() ){
+      _flag = true;
+    }else{
+      _flag = false;
+    }
+
+    // перевірка модуляції сигналу
+    // якщо маркер на підняття рівня стоїть та попередня позиція була низький рівень, піднімаємо рівень
+    // якщо маркер на підняття рівня опущений та попередня позиція була піднята, опускаємо рівень
+    // якщо ні одна умова не виконується -> нічого не робимо
+    if(_flag == true && _lastPosition == false){
+      digitalWrite(_PWMPin,HIGH);
+      _lastPosition = true;
+
+    }else if(_flag == false && _lastPosition == true){
+      digitalWrite(_PWMPin,LOW);
+      _lastPosition = false;
+
+    }else{
+      // _flag == _lastPosition -> nothing doing
+    }
+
   }
 
   
