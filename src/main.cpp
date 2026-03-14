@@ -27,9 +27,9 @@ class rtos {
   // chech time out in millis
   bool mainrtos (){
     
-    if( (_zeroPoint - millis()) >= _holdTime){
+    if( (millis() - _zeroPoint) >= _holdTime){
       _zeroPoint = millis();
-      
+
       _flag = true;
       return _flag;
 
@@ -146,21 +146,29 @@ void setup() {
 
 
 
-  task_1.setTime(1000);
+  task_1.setTime(100);
+  task_2.setTime(100);
+  task_3.setTime(100);
 
-  ledRed.update_hard_PWM(10);
-  ledBlue.update_hard_PWM(10);
-  ledGreen.update_hard_PWM(10);
+  task_4.setTime(15000);
+  task_5.setTime(1000);
+
+  //ledRed.update_hard_PWM(10);
+  //ledBlue.update_hard_PWM(10);
+  //ledGreen.update_hard_PWM(10);
 }
 
 
 int flag = false;
+
 int i = 0;
+int j = 0;
+int k = 0;
+
 void loop() {
-/*
 
   if( (task_1.mainrtos()) == true){
-    i = i + 5;
+    i = i + 3;
     if(i <= 100){
       ledRed.update_hard_PWM(i);
     } else{
@@ -168,23 +176,40 @@ void loop() {
     }
     
   }
-  */
- // ledRed.PWMmain();
-  //ledBlue.PWMmain();
-  //ledGreen.PWMmain();
-  
-  //digitalWrite(LED_BLUE, HIGH);
-  //delay(250);
-  //digitalWrite(LED_BLUE, LOW);
-  //delay(250);
-  Serial.printf("void loop\n");
 
-  if( task_1.mainrtos()){
-    Serial.printf("flag rtos == true\n");
-  }else{
-    Serial.printf("flag rtos == false\n");
+  if( (task_2.mainrtos()) == true){
+    j = j + 5;
+    if(j <= 100){
+      ledGreen.update_hard_PWM(i);
+    } else{
+      j = 0;
+    }
+    
   }
-  delay(100);
+
+  if( (task_3.mainrtos()) == true){
+    k = k + 7;
+    if(k <= 100){
+      ledBlue.update_hard_PWM(i);
+    } else{
+      k = 0;
+    }
+    
+  }
+  
+  ledRed.PWMmain();
+  ledBlue.PWMmain();
+  ledGreen.PWMmain();
+  
+
+  if(task_4.mainrtos()){
+    Serial.printf("TIME_PUT_15_SECOND\n");
+  }
+  if(task_5.mainrtos()){
+    Serial.printf("i-> %d. j-> %d. k-> %d. \n", i,j,k);
+  }
+  
+ 
 }
 
 
