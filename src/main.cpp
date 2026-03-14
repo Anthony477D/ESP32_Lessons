@@ -131,3 +131,36 @@ void loop() {
 }
 
 
+class rtos {
+  private:
+    uint32_t _zeroPoint;
+    uint32_t _curentTime;
+    uint16_t _holdTime;
+
+  public:
+    bool flag;
+
+  void setTime (uint16_t holdTime){
+    _zeroPoint = micros();
+    _holdTime = holdTime;
+  };
+
+
+  bool mainrtos (uint16_t time){
+    _curentTime = micros();
+    if( (_curentTime - _zeroPoint) >= time ){
+      return true;
+    }else{
+      return false;
+    }
+  };
+  
+
+    
+
+
+  
+
+
+} ;
+
