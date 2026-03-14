@@ -46,6 +46,12 @@ rtos task_3;
 rtos task_4;
 rtos task_5;
 
+rtos task_led200ms;
+rtos task_led500ms;
+rtos task_led1000ms;
+
+rtos task_leddelay;
+
 class corectPWM{
   private:
   uint8_t _PWMFreq; // частота ШІМ сигналу в герцах. Максимум 255Гц, це дасть ширину фрагмента в 3.9 мілісекунди
@@ -140,11 +146,13 @@ void setup() {
   
   Serial.begin(115200); // Додаємо монітор порту для діагностики та виводу інформації
   
-  ledRed.init_PWM(LED_RED,100);
-  ledBlue.init_PWM(LED_BLUE,100);
-  ledGreen.init_PWM(LED_GREEN,100);
+  ledRed.init_PWM(LED_RED,1);
+  ledBlue.init_PWM(LED_BLUE,2);
+  ledGreen.init_PWM(LED_GREEN,5);
 
-
+  ledRed.update_hard_PWM(5);
+  ledBlue.update_hard_PWM(10);
+  ledGreen.update_hard_PWM(25);
 
   task_1.setTime(100);
   task_2.setTime(100);
@@ -153,9 +161,9 @@ void setup() {
   task_4.setTime(15000);
   task_5.setTime(1000);
 
-  //ledRed.update_hard_PWM(10);
-  //ledBlue.update_hard_PWM(10);
-  //ledGreen.update_hard_PWM(10);
+
+
+  
 }
 
 
@@ -166,7 +174,7 @@ int j = 0;
 int k = 0;
 
 void loop() {
-
+/*
   if( (task_1.mainrtos()) == true){
     i = i + 3;
     if(i <= 100){
@@ -196,18 +204,19 @@ void loop() {
     }
     
   }
-  
+  */
   ledRed.PWMmain();
   ledBlue.PWMmain();
   ledGreen.PWMmain();
   
-
   if(task_4.mainrtos()){
     Serial.printf("TIME_PUT_15_SECOND\n");
   }
   if(task_5.mainrtos()){
     Serial.printf("i-> %d. j-> %d. k-> %d. \n", i,j,k);
   }
+  
+
   
  
 }
