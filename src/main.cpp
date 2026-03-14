@@ -9,6 +9,43 @@
 #define LED_GREEN 17
 #define LED_BLUE 16
 
+// rtos -> testin on future code
+class rtos {
+  private:
+    uint32_t _zeroPoint;
+    uint16_t _holdTime;
+
+  public:
+    bool _flag;
+
+  // set rtos time delay in millis
+  void setTime (uint16_t holdTime){
+    _zeroPoint = micros();
+    _holdTime = holdTime;
+  };
+
+  // chech time out in millis
+  bool mainrtos (){
+    
+    if( (_zeroPoint - millis()) >= _holdTime){
+      _zeroPoint = millis();
+      
+      _flag = true;
+      return _flag;
+
+    }else{
+      _flag = false;
+      return _flag;
+    }
+
+  };
+};
+rtos task_1;
+rtos task_2;
+rtos task_3;
+rtos task_4;
+rtos task_5;
+
 class corectPWM{
   private:
   uint8_t _PWMFreq; // частота ШІМ сигналу в герцах. Максимум 255Гц, це дасть ширину фрагмента в 3.9 мілісекунди
@@ -109,58 +146,45 @@ void setup() {
 
 
 
+  task_1.setTime(1000);
+
   ledRed.update_hard_PWM(10);
-  ledBlue.update_hard_PWM(90);
+  ledBlue.update_hard_PWM(10);
   ledGreen.update_hard_PWM(10);
 }
 
 
 int flag = false;
+int i = 0;
 void loop() {
+/*
 
-  
-  ledRed.PWMmain();
-  ledBlue.PWMmain();
-  ledGreen.PWMmain();
+  if( (task_1.mainrtos()) == true){
+    i = i + 5;
+    if(i <= 100){
+      ledRed.update_hard_PWM(i);
+    } else{
+      i = 0;
+    }
+    
+  }
+  */
+ // ledRed.PWMmain();
+  //ledBlue.PWMmain();
+  //ledGreen.PWMmain();
   
   //digitalWrite(LED_BLUE, HIGH);
   //delay(250);
   //digitalWrite(LED_BLUE, LOW);
   //delay(250);
-  //Serial.printf("I am loop");
+  Serial.printf("void loop\n");
+
+  if( task_1.mainrtos()){
+    Serial.printf("flag rtos == true\n");
+  }else{
+    Serial.printf("flag rtos == false\n");
+  }
+  delay(100);
 }
 
-
-class rtos {
-  private:
-    uint32_t _zeroPoint;
-    uint32_t _curentTime;
-    uint16_t _holdTime;
-
-  public:
-    bool flag;
-
-  void setTime (uint16_t holdTime){
-    _zeroPoint = micros();
-    _holdTime = holdTime;
-  };
-
-
-  bool mainrtos (uint16_t time){
-    _curentTime = micros();
-    if( (_curentTime - _zeroPoint) >= time ){
-      return true;
-    }else{
-      return false;
-    }
-  };
-  
-
-    
-
-
-  
-
-
-} ;
 
