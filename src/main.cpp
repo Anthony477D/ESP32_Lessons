@@ -1,6 +1,5 @@
 /*
-Створюємо програмний PWM але замість керування частоти блимання окремих світлодіодів керуємо кольорами RGB світлодіода
-кожен PWM канал керує окремим кольором. Значення задаються з терміналу у відсотках скважності 0-100
+
 */
 
 #include <Arduino.h>
@@ -8,6 +7,28 @@
 #define LED_RED 18
 #define LED_GREEN 17
 #define LED_BLUE 16
+
+#define MET_1 4 //1
+/* базова реалізація кнопки без будь який налаштувань
+при натисканні рахуємо кількість хибних спрацювань через переивання та виводимо в термінал число
+*/ 
+
+#define MET_2 5 //2
+/* Ркалізація брязкоту контакту через переривання та затримку <50мс
+*/
+
+#define MET_3 7 //4
+/* Debounce через перевірку рівня (state-based)
+в основному циклі приймати подію в обробку тільки тоді коли кнопка досі натиснута / ішнорувати події при відпусканні
+*/
+
+#define MET_4 1 //5
+/* Polling + debounce (без interrupts)
+прибрати повністю переривання / опитувати кнопку кодні 5-10мс, реалізувати як машину станів
+*/
+#define MET_5 2 //7
+/* Додати RC-фільтр (конденсатор 100n і резистор 100R, підтягуючий незмінний 10k)
+*/
 
 // rtos -> testin on future code
 class rtos {
@@ -40,18 +61,10 @@ class rtos {
 
   };
 };
+
 rtos task_1;
-rtos task_2;
-rtos task_3;
-rtos task_4;
-rtos task_5;
-
-rtos task_led200ms;
-rtos task_led500ms;
-rtos task_led1000ms;
-
-rtos task_leddelay;
-
+rtos pushBattonInform;
+// Software PWM class
 class corectPWM{
   private:
   uint8_t _PWMFreq; // частота ШІМ сигналу в герцах. Максимум 255Гц, це дасть ширину фрагмента в 3.9 мілісекунди
@@ -137,88 +150,102 @@ class corectPWM{
 
 };
 
-corectPWM ledRed;
-corectPWM ledGreen;
-corectPWM ledBlue;
+static uint8_t itr_1 = 0;
+static uint8_t itr_2 = 0;
+static uint8_t itr_3 = 0;
 
-
-void setup() {
-  
-  Serial.begin(115200); // Додаємо монітор порту для діагностики та виводу інформації
-  
-  ledRed.init_PWM(LED_RED,1);
-  ledBlue.init_PWM(LED_BLUE,2);
-  ledGreen.init_PWM(LED_GREEN,5);
-
-  ledRed.update_hard_PWM(5);
-  ledBlue.update_hard_PWM(10);
-  ledGreen.update_hard_PWM(25);
-
-  task_1.setTime(100);
-  task_2.setTime(100);
-  task_3.setTime(100);
-
-  task_4.setTime(15000);
-  task_5.setTime(1000);
-
-
-
-  
+int32_t _setzero_1;
+bool flagMetod_1 = false;
+void IRAM_ATTR interaptMetod1(){
+  itr_1 = itr_1 + 1;
+  flagMetod_1 = true;
+  _setzero_1 = millis();
+}
+bool flagMetod_2 = false;
+int32_t _setzero_2;
+void IRAM_ATTR interaptMetod2(){
+  //itr_2 = itr_2 + 1;
+  flagMetod_2 = true;
+  _setzero_2 = millis();
+}
+bool flagMetod_3 = false;
+void IRAM_ATTR interaptMetod3(){
+  itr_3 = itr_3 + 1;
+  flagMetod_3 = true;
 }
 
+void setup() {
+  Serial.begin(115200); // Додаємо монітор порту для діагностики та виводу інформації
+  Serial.printf("TIME_PUT_15_SECOND\n");
 
-int flag = false;
-
-int i = 0;
-int j = 0;
-int k = 0;
-
-void loop() {
-/*
-  if( (task_1.mainrtos()) == true){
-    i = i + 3;
-    if(i <= 100){
-      ledRed.update_hard_PWM(i);
-    } else{
-      i = 0;
-    }
-    
-  }
-
-  if( (task_2.mainrtos()) == true){
-    j = j + 5;
-    if(j <= 100){
-      ledGreen.update_hard_PWM(i);
-    } else{
-      j = 0;
-    }
-    
-  }
-
-  if( (task_3.mainrtos()) == true){
-    k = k + 7;
-    if(k <= 100){
-      ledBlue.update_hard_PWM(i);
-    } else{
-      k = 0;
-    }
-    
-  }
-  */
-  ledRed.PWMmain();
-  ledBlue.PWMmain();
-  ledGreen.PWMmain();
+  task_1.setTime(1000);
+  pushBattonInform.setTime(10);
   
-  if(task_4.mainrtos()){
-    Serial.printf("TIME_PUT_15_SECOND\n");
-  }
-  if(task_5.mainrtos()){
-    Serial.printf("i-> %d. j-> %d. k-> %d. \n", i,j,k);
+  pinMode(MET_1, INPUT_PULLDOWN);
+  pinMode(MET_2, INPUT_PULLDOWN);
+  pinMode(MET_3, INPUT_PULLDOWN);
+
+  pinMode(MET_4, INPUT_PULLDOWN);
+
+  attachInterrupt(digitalPinToInterrupt(MET_1), interaptMetod1, RISING);
+  attachInterrupt(digitalPinToInterrupt(MET_2), interaptMetod2, RISING);
+  attachInterrupt(digitalPinToInterrupt(MET_3), interaptMetod3, RISING);
+
+
+
+}
+
+uint8_t delayFirstMethod_ms = 250; //затримка в мілісекундах між надсиланням інйормації та скидання лічильника переривань
+void loop() {  
+  // first mothod
+  if(flagMetod_1 == true && ((millis() - _setzero_1) >= delayFirstMethod_ms)){
+    Serial.printf("кількість зафіксованих натискань на кнопку 1 (yellow) ->%d \n",itr_1);
+    flagMetod_1 = false;
+    itr_1 = 0;
   }
   
 
-  
- 
+  // second method
+
+  if( (flagMetod_2 == true) && ((millis() - _setzero_2) >= 50) && (digitalRead(MET_2) == true) ){
+    //Serial.printf("Button 2 is PUSHEEEEED");
+    itr_2 = itr_2 + 1;
+    flagMetod_2 = false;
+
+  }else if ((flagMetod_2 == true) && ((millis() - _setzero_2) >= 50) && (digitalRead(MET_2) == false) ){
+    flagMetod_2 = false;
+    Serial.printf("Кнопка 2 була натиснута - %d разів\n",itr_2);
+    itr_2 = 0;
+  }
+
+  // metod three
+
+  if( (flagMetod_3 == true) && (digitalRead(MET_3) == true) ){
+    if(pushBattonInform.mainrtos() == true){
+      Serial.printf("кнопка 3 натиснута 10мс\n");
+    }
+  }else{
+    flagMetod_3 = false;
+  }
+
+  // metod 4
+
+
+
+
+
+
+
+
+
+
+
+
+
+ if(task_1.mainrtos()){
+  Serial.printf("ITR_1->%d ITR_2->%d ITR_3->%d \n", itr_1, itr_2, itr_3);
+  itr_1 = 0; itr_2 = 0; itr_3 = 0;
+ }
 }
 
 
