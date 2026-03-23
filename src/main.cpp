@@ -64,6 +64,7 @@ class rtos {
 
 rtos task_1;
 rtos pushBattonInform;
+rtos buttoncall;
 // Software PWM class
 class corectPWM{
   private:
@@ -150,6 +151,7 @@ class corectPWM{
 
 };
 
+
 static uint8_t itr_1 = 0;
 static uint8_t itr_2 = 0;
 static uint8_t itr_3 = 0;
@@ -180,20 +182,21 @@ void setup() {
 
   task_1.setTime(1000);
   pushBattonInform.setTime(10);
+  buttoncall.setTime(20);
   
   pinMode(MET_1, INPUT_PULLDOWN);
   pinMode(MET_2, INPUT_PULLDOWN);
   pinMode(MET_3, INPUT_PULLDOWN);
 
   pinMode(MET_4, INPUT_PULLDOWN);
+  pinMode(MET_5, INPUT_PULLDOWN);
 
   attachInterrupt(digitalPinToInterrupt(MET_1), interaptMetod1, RISING);
   attachInterrupt(digitalPinToInterrupt(MET_2), interaptMetod2, RISING);
   attachInterrupt(digitalPinToInterrupt(MET_3), interaptMetod3, RISING);
 
-
-
 }
+uint16_t itr_4_buttocall = 0;
 
 uint8_t delayFirstMethod_ms = 250; //затримка в мілісекундах між надсиланням інйормації та скидання лічильника переривань
 void loop() {  
@@ -231,12 +234,22 @@ void loop() {
   // metod 4
 
 
+  if(buttoncall.mainrtos()){
+    if(digitalRead(MET_4) == true){
+      itr_4_buttocall++; 
+    }else{
+      // button false
+    }
+  }
 
+  // metod_5 hardware solution
 
-
-
-
-
+  if(digitalRead(MET_5) == true){
+    // button enable
+    
+  }else{
+    // button disable
+  }
 
 
 
@@ -244,8 +257,15 @@ void loop() {
 
  if(task_1.mainrtos()){
   Serial.printf("ITR_1->%d ITR_2->%d ITR_3->%d \n", itr_1, itr_2, itr_3);
-  itr_1 = 0; itr_2 = 0; itr_3 = 0;
+  itr_1 = 0; itr_2 = 0; itr_3 = 0; itr_4_buttocall = 0;
  }
+
+ 
+
+
+
 }
+
+
 
 
