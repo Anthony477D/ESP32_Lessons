@@ -197,6 +197,7 @@ void setup() {
 
 }
 uint16_t itr_4_buttocall = 0;
+uint16_t itr_5_buttocall = 0;
 
 uint8_t delayFirstMethod_ms = 250; //затримка в мілісекундах між надсиланням інйормації та скидання лічильника переривань
 void loop() {  
@@ -237,8 +238,10 @@ void loop() {
   if(buttoncall.mainrtos()){
     if(digitalRead(MET_4) == true){
       itr_4_buttocall++; 
+      Serial.printf("кнопка 4 натиснута %d разів\n", itr_4_buttocall);
     }else{
       // button false
+      itr_4_buttocall = 0;
     }
   }
 
@@ -246,8 +249,11 @@ void loop() {
 
   if(digitalRead(MET_5) == true){
     // button enable
+    itr_5_buttocall ++;
+    Serial.printf("кнопка 5 натиснута %d разів\n", itr_5_buttocall);
     
   }else{
+    itr_5_buttocall =0;
     // button disable
   }
 
