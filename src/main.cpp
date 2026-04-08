@@ -48,6 +48,97 @@
 #define RESOLUTIO_TIMER_mSEC 100
 #define TIM2SEC 10 // = 1sec/RSOLUTION_TIMER_mSEC
 
+// Software PWM class
+class corectPWM{
+  private:
+  uint8_t _PWMFreq; // частота ШІМ сигналу в герцах. Максимум 255Гц, це дасть ширину фрагмента в 3.9 мілісекунди
+  uint8_t _PWMPin;
+
+  uint32_t _timeSegment; // час одного фрейму PWM сигналу
+  uint32_t _UPPWMTime;
+
+  bool _flag;
+  bool _lastPosition;
+
+  uint32_t _zeroPoint;
+  uint32_t _curentTime;
+
+  public:
+    
+  void init_PWM(uint8_t PinGPIO,uint8_t FreqPWM){
+    // запис вхідних данниї в обєкт класу для подальщої роботи
+    _PWMPin = PinGPIO;
+    _PWMFreq = FreqPWM; // частота до 255Гц
+
+    // ініціалізація піна, та всталовлення його в режим LOW
+    pinMode(_PWMPin, OUTPUT);
+    digitalWrite(_PWMPin,LOW);
+
+    // розрахунок часу тривалорсті одного фрейму PWM сигналу
+    uint32_t onesecond = 1000000; // значення однієї секунди в тактах для нашої опорної частоти
+    _timeSegment = onesecond / _PWMFreq;
+
+    _flag = false;
+    _lastPosition = false;
+  }
+
+  // для збільшення чутливості, duty задається в форматі цілого числа, але з сотою частиною відсотка
+  // 1% -> 100 / 5% -> 500 / 30% -> 3000 / 100% -> 10000
+  // це дозволяє на порядок збільшити чутливість PWM, а int формат - задає простоту розрахунків відносно float
+  void update_soft_PWM(uint16_t duty){
+    _UPPWMTime = (_timeSegment * duty) / 10000; // розраховуємо час тривалості логічної 1 в PWM фреймі
+    _zeroPoint = micros(); 
+  }
+
+  // для не тревіальних завдань, значкння в відсотках від 1 - 100
+  void update_hard_PWM(uint8_t duty){
+    _UPPWMTime = (_timeSegment * duty) / 100; // розраховуємо час тривалості логічної 1 в PWM фреймі
+    _zeroPoint = micros(); 
+  }
+
+  // основний цикл модуляції ШИМ
+  void PWMmain(){
+    _curentTime = micros();
+    // перевірка лічильника фрейма
+    // якщо нульова точка + час фреймк >= за фактичний час то перезаписуємо час нульової точки
+    if( (_curentTime - _zeroPoint) >= _timeSegment ){
+      _zeroPoint = _curentTime;
+    }
+
+    // перевірка лічильника високого рівня фрейму
+    // якщо нуль + час високого рівня < таймера ставимо маркер на підняття рівня
+    // якщо менше -> маркер на зменшення рівня
+    if( (_curentTime - _zeroPoint) <= _UPPWMTime ){
+      _flag = true;
+    }else{
+      _flag = false;
+    }
+
+    // перевірка модуляції сигналу
+    // якщо маркер на підняття рівня стоїть та попередня позиція була низький рівень, піднімаємо рівень
+    // якщо маркер на підняття рівня опущений та попередня позиція була піднята, опускаємо рівень
+    // якщо ні одна умова не виконується -> нічого не робимо
+    if(_flag == true && _lastPosition == false){
+      digitalWrite(_PWMPin,HIGH);
+      _lastPosition = true;
+
+    }else if(_flag == false && _lastPosition == true){
+      digitalWrite(_PWMPin,LOW);
+      _lastPosition = false;
+
+    }else{
+      // _flag == _lastPosition -> nothing doing
+    }
+
+  }
+
+};
+
+
+corectPWM yellow_blink_color;
+corectPWM green_blink_color;
+corectPWM green_blink_people;
+
 class rtos {
   private:
     uint32_t _zeroPoint;
@@ -85,12 +176,15 @@ class rtos {
 };
 
 
-
+// create maine base freq to iteration color car leds
 rtos main_timer;
 
+// function to setup color mode
 uint8_t set_state_color(uint16_t);
-
+// function to set outputs pin on led
 void release_state_color(uint8_t);
+// function to setup peple leds
+void people_state_color(void);
 
 
 void setup() {
@@ -106,6 +200,15 @@ void setup() {
 
   
 
+  yellow_blink_color.init_PWM(YELLOW_CAR,2);
+  yellow_blink_color.update_hard_PWM(50);
+
+  green_blink_color.init_PWM(GREEN_CAR,2);
+  green_blink_color.update_hard_PWM(50);
+
+  green_blink_people.init_PWM(GREEN_PEOPLE,2);
+  green_blink_people.update_hard_PWM(50);
+
   main_timer.setTime(100); // задаємосновний час роботи
 }
 
@@ -115,6 +218,7 @@ uint16_t itr = 1;
 void loop() {
   uint32_t test_counter = set_state_color(itr);
   release_state_color(test_counter);
+  people_state_color();
 
   if(main_timer.mainrtos()){
     itr ++;
@@ -125,15 +229,7 @@ void loop() {
 
 
 
-  if(digitalRead(RED_CAR) == HIGH){
-    digitalWrite(GREEN_PEOPLE, HIGH);
-    digitalWrite(RED_PEPLE, LOW);
-  }
-
-  if(digitalRead(GREEN_CAR) == HIGH){
-    digitalWrite(RED_PEPLE, HIGH);
-    digitalWrite(GREEN_PEOPLE, LOW);
-  }
+  
     
 }
 
@@ -152,22 +248,26 @@ uint8_t set_state_color(uint16_t count) {
     return state_color;
   }
 
-  // yellow
+  // red and yellow
   if((time_to_red <= count) && (count <= time_to_redyellowgreen)){
     state_color = 2;
     return state_color; 
   }
 
   // green
-  if((time_to_redyellowgreen <= count) && (count <= time_to_green)){
+  if((time_to_redyellowgreen <= count) && (count <= (time_to_green-(2*TIM2SEC)))){
     state_color = 3;
     return state_color;
   }
   
   // blinkgreen
+  if( ((time_to_green-(2*TIM2SEC)) <= count ) && (count <= time_to_green)){
+    state_color = 4;
+    return state_color;
+  }
   
 
-  // yellow2red
+  // yellow to red (green swich to red)
   if((time_to_green <= count) && (count <= time_to_greenyellowred)){
     state_color = 5;
     return state_color;
@@ -196,7 +296,7 @@ void release_state_color(uint8_t state){
   
   case 2:
     //code
-    digitalWrite(RED_CAR,LOW);
+    digitalWrite(RED_CAR,HIGH);
     digitalWrite(YELLOW_CAR,HIGH);
     digitalWrite(GREEN_CAR,LOW);
     break;
@@ -208,6 +308,11 @@ void release_state_color(uint8_t state){
     digitalWrite(GREEN_CAR,HIGH);
     break;
 
+  case 4:
+    //code
+    green_blink_color.PWMmain();
+    break;
+
   case 5:
     // code
     digitalWrite(RED_CAR,LOW);
@@ -217,3 +322,25 @@ void release_state_color(uint8_t state){
   }
 
 };
+
+
+void people_state_color(void){
+  if((digitalRead(RED_CAR) == HIGH) && (digitalRead(YELLOW_CAR) == LOW) ){
+    digitalWrite(GREEN_PEOPLE, HIGH);
+    digitalWrite(RED_PEPLE, LOW);
+  }
+
+  if(digitalRead(GREEN_CAR) == HIGH){
+    digitalWrite(RED_PEPLE, HIGH);
+    digitalWrite(GREEN_PEOPLE, LOW);
+  }
+
+  if((digitalRead(YELLOW_CAR) == HIGH) && (digitalRead(RED_CAR) == HIGH)){
+    green_blink_people.PWMmain();
+  }
+
+}
+
+
+
+
