@@ -48,6 +48,9 @@
 #define RESOLUTIO_TIMER_mSEC 100
 #define TIM2SEC 10 // = 1sec/RSOLUTION_TIMER_mSEC
 
+
+
+
 // Software PWM class
 class corectPWM{
   private:
@@ -178,6 +181,8 @@ class rtos {
 
 // create maine base freq to iteration color car leds
 rtos main_timer;
+rtos check_button_timer;
+rtos check_light_timer;
 
 // function to setup color mode
 uint8_t set_state_color(uint16_t);
@@ -185,6 +190,8 @@ uint8_t set_state_color(uint16_t);
 void release_state_color(uint8_t);
 // function to setup peple leds
 void people_state_color(void);
+
+
 
 
 void setup() {
@@ -198,7 +205,7 @@ void setup() {
   pinMode(RED_PEPLE, OUTPUT);
   pinMode(GREEN_PEOPLE, OUTPUT);
 
-  
+  pinMode(BUTTON, INPUT_PULLDOWN);
 
   yellow_blink_color.init_PWM(YELLOW_CAR,2);
   yellow_blink_color.update_hard_PWM(50);
@@ -210,26 +217,35 @@ void setup() {
   green_blink_people.update_hard_PWM(50);
 
   main_timer.setTime(100); // задаємосновний час роботи
+  check_button_timer.setTime(10);
+  check_light_timer.setTime(500);
 }
 
 
 uint16_t itr = 1;
-
+uint8_t sate_mashine;
+bool button_flag;
 void loop() {
-  uint32_t test_counter = set_state_color(itr);
-  release_state_color(test_counter);
+  sate_mashine = set_state_color(itr);
+  
+  release_state_color(sate_mashine);
   people_state_color();
 
   if(main_timer.mainrtos()){
     itr ++;
-            Serial.printf("itr %d \n", itr);
-            Serial.printf("test_counter %d \n", test_counter);
+            //Serial.printf("itr %d \n", itr);
+            //Serial.printf("test_counter %d \n", sate_mashine);
   }
 
+  if((check_button_timer.mainrtos()) && (button_flag == false) ){
+            
+    button_flag = digitalRead(BUTTON);
 
-
-
-  
+    if( (button_flag == true) && (digitalRead(GREEN_CAR) == HIGH)){
+      itr = (RED_COLORTIME_SECOND+YELLOW_COLORTIME_SECOND+GREEN_COLORTIME_SECOND-2)*TIM2SEC;
+    }
+    //Serial.printf("button status -> %d \n",button_flag);
+  }
     
 }
 
@@ -299,6 +315,7 @@ void release_state_color(uint8_t state){
     digitalWrite(RED_CAR,HIGH);
     digitalWrite(YELLOW_CAR,HIGH);
     digitalWrite(GREEN_CAR,LOW);
+    button_flag = false;
     break;
 
   case 3:
@@ -340,6 +357,9 @@ void people_state_color(void){
   }
 
 }
+
+
+
 
 
 
