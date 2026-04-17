@@ -40,16 +40,23 @@
 #define LIGHT_SENSETIVE 10
 
 
-// timer define
+// timer define for color can stay HIGT(set in second)
 #define RED_COLORTIME_SECOND 5
 #define YELLOW_COLORTIME_SECOND 2
 #define GREEN_COLORTIME_SECOND 5
 
-#define RESOLUTIO_TIMER_mSEC 100
-#define TIM2SEC 10 // = 1sec/RSOLUTION_TIMER_mSEC
+#define BLINK_GREEN 25 // procent
 
 
+struct TraficLightConfig {
+  uint32_t red_time;
+  uint32_t yellow_2_green;
+  uint32_t green;
+  uint32_t blink_green;
+  uint32_t yellow_2_red;
+};
 
+TraficLightConfig Current_trafic_time;
 
 // Software PWM class
 class corectPWM{
@@ -137,11 +144,12 @@ class corectPWM{
 
 };
 
-
+// create user PWM class to release blink signal
 corectPWM yellow_blink_color;
 corectPWM green_blink_color;
 corectPWM green_blink_people;
 
+// Software user RTOS class
 class rtos {
   private:
     uint32_t _zeroPoint;
@@ -171,26 +179,28 @@ class rtos {
     }
 
   };
-
+  /*
   //set zero timer
   void setZero(){
     _zeroPoint = millis();
   }
+    */
 };
 
 
-// create maine base freq to iteration color car leds
-rtos main_timer;
+// create user rtos to checked button and sensor
 rtos check_button_timer;
 rtos check_light_timer;
 
-// function to setup color mode
-uint8_t set_state_color(uint16_t);
+
 // function to set outputs pin on led
 void release_state_color(uint8_t);
-// function to setup peple leds
+// function to setup people leds
 void people_state_color(void);
-
+// function to setup curent ctate
+uint8_t state_mashine (void);
+// funcion to setup timers for color
+void setup_trafic_time (void);
 
 
 
@@ -198,150 +208,115 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   
+  // setup cal color to output mode
   pinMode(RED_CAR, OUTPUT);
   pinMode(YELLOW_CAR, OUTPUT);
   pinMode(GREEN_CAR, OUTPUT);
 
+  // set people color to output
   pinMode(RED_PEPLE, OUTPUT);
   pinMode(GREEN_PEOPLE, OUTPUT);
 
+  // set button to read
   pinMode(BUTTON, INPUT_PULLDOWN);
 
-  yellow_blink_color.init_PWM(YELLOW_CAR,2);
+  // set sun sensor to read
+  pinMode(LIGHT_SENSETIVE, INPUT_PULLDOWN);
+
+
+  // create and setup PWM for yellow color for car
+  yellow_blink_color.init_PWM(YELLOW_CAR,3);
   yellow_blink_color.update_hard_PWM(50);
 
-  green_blink_color.init_PWM(GREEN_CAR,2);
+  // create and setup PWM for green color for car
+  green_blink_color.init_PWM(GREEN_CAR,3);
   green_blink_color.update_hard_PWM(50);
 
-  green_blink_people.init_PWM(GREEN_PEOPLE,2);
+  // create and setup PWM for green color for people
+  green_blink_people.init_PWM(GREEN_PEOPLE,3);
   green_blink_people.update_hard_PWM(50);
 
-  main_timer.setTime(100); // задаємосновний час роботи
+  // create and setup how much we can read button and sensor data
   check_button_timer.setTime(10);
   check_light_timer.setTime(500);
+
+  setup_trafic_time();
 }
 
 
-uint16_t itr = 1;
-uint8_t sate_mashine;
-bool button_flag;
+
 void loop() {
-  sate_mashine = set_state_color(itr);
-  
-  release_state_color(sate_mashine);
+ 
+  uint8_t some_trash;
+
+  //some_trash = state_mashine();
+  //Serial.printf("curent state ->%d \n",some_trash);
+  release_state_color( state_mashine());
+
   people_state_color();
-
-  if(main_timer.mainrtos()){
-    itr ++;
-            //Serial.printf("itr %d \n", itr);
-            //Serial.printf("test_counter %d \n", sate_mashine);
-  }
-
-  if((check_button_timer.mainrtos()) && (button_flag == false) ){
-            
-    button_flag = digitalRead(BUTTON);
-
-    if( (button_flag == true) && (digitalRead(GREEN_CAR) == HIGH)){
-      itr = (RED_COLORTIME_SECOND+YELLOW_COLORTIME_SECOND+GREEN_COLORTIME_SECOND-2)*TIM2SEC;
-    }
-    //Serial.printf("button status -> %d \n",button_flag);
-  }
-    
 }
 
-uint8_t set_state_color(uint16_t count) {
-  uint8_t state_color = 0;
-
-  uint16_t time_to_red = RED_COLORTIME_SECOND * TIM2SEC;
-  uint16_t time_to_redyellowgreen = (RED_COLORTIME_SECOND+YELLOW_COLORTIME_SECOND)*TIM2SEC;
-  uint16_t time_to_green = (RED_COLORTIME_SECOND+YELLOW_COLORTIME_SECOND+GREEN_COLORTIME_SECOND)*TIM2SEC;
-  uint16_t time_to_blinkgreen;
-  uint16_t time_to_greenyellowred =(RED_COLORTIME_SECOND+(YELLOW_COLORTIME_SECOND*2)+GREEN_COLORTIME_SECOND)*TIM2SEC;
-
-  // red
-  if(count <= time_to_red){
-    state_color = 1;
-    return state_color;
-  }
-
-  // red and yellow
-  if((time_to_red <= count) && (count <= time_to_redyellowgreen)){
-    state_color = 2;
-    return state_color; 
-  }
-
-  // green
-  if((time_to_redyellowgreen <= count) && (count <= (time_to_green-(2*TIM2SEC)))){
-    state_color = 3;
-    return state_color;
-  }
-  
-  // blinkgreen
-  if( ((time_to_green-(2*TIM2SEC)) <= count ) && (count <= time_to_green)){
-    state_color = 4;
-    return state_color;
-  }
-  
-
-  // yellow to red (green swich to red)
-  if((time_to_green <= count) && (count <= time_to_greenyellowred)){
-    state_color = 5;
-    return state_color;
-  }
-  
-  else{
-    itr = 0;
-    state_color = 1;
-    return state_color;
-  }
-
-
-};
-
-
+// реалізація кейсів кепування сигналів на діод
+//***************************************************************************
 void release_state_color(uint8_t state){
 
+  // case main color setup, car color
   switch (state)
   {
   case 1:
-    //code
+    //code "red active"
     digitalWrite(RED_CAR,HIGH);
     digitalWrite(YELLOW_CAR, LOW);
     digitalWrite(GREEN_CAR,LOW);
     break;
   
   case 2:
-    //code
+    //code "red and yellow active, -> when red changed to green"
     digitalWrite(RED_CAR,HIGH);
     digitalWrite(YELLOW_CAR,HIGH);
     digitalWrite(GREEN_CAR,LOW);
-    button_flag = false;
     break;
 
   case 3:
-    //code
+    //code "green active"
     digitalWrite(RED_CAR,LOW);
     digitalWrite(YELLOW_CAR,LOW);
     digitalWrite(GREEN_CAR,HIGH);
     break;
 
   case 4:
-    //code
+    //code "bling green, -> when green color time is ending"
     green_blink_color.PWMmain();
     break;
 
   case 5:
-    // code
+    // code "yellow active, -> when green changet to red"
     digitalWrite(RED_CAR,LOW);
     digitalWrite(YELLOW_CAR,HIGH);
     digitalWrite(GREEN_CAR,LOW);
     break;  
+
+  case 0: // case to night mode
+    //code "blink yellow, -> red and green switch to disactive"
+    yellow_blink_color.PWMmain();
+
+    digitalWrite(GREEN_CAR, LOW);
+    digitalWrite(RED_CAR, LOW);
+
+    digitalWrite(GREEN_PEOPLE, LOW);
+    digitalWrite(RED_PEPLE,LOW);
+
+    break;
   }
 
 };
+//***************************************************************************
 
-
+//реалізація індикації світлофора для пішозодів
+//***************************************************************************
 void people_state_color(void){
+  // release people color ()
+  // we only checked pin for a car color and swich people colo
   if((digitalRead(RED_CAR) == HIGH) && (digitalRead(YELLOW_CAR) == LOW) ){
     digitalWrite(GREEN_PEOPLE, HIGH);
     digitalWrite(RED_PEPLE, LOW);
@@ -351,12 +326,180 @@ void people_state_color(void){
     digitalWrite(RED_PEPLE, HIGH);
     digitalWrite(GREEN_PEOPLE, LOW);
   }
-
+  // release blinking green, when car color changet to green 
   if((digitalRead(YELLOW_CAR) == HIGH) && (digitalRead(RED_CAR) == HIGH)){
     green_blink_people.PWMmain();
   }
 
 }
+//***************************************************************************
+
+// розразунок та приведення в потрібну для програму форму значень тривалості індикації світлофора
+//***************************************************************************
+void setup_trafic_time (void){
+  // main timer can be addition time to oher color
+  uint16_t scale = 1000; // convert second to milisecond
+  uint8_t blink_green_car = BLINK_GREEN; 
+
+  Current_trafic_time.red_time = RED_COLORTIME_SECOND * scale;
+
+  Current_trafic_time.yellow_2_green = YELLOW_COLORTIME_SECOND * scale; 
+
+  Current_trafic_time.green =((GREEN_COLORTIME_SECOND * scale)/100) * (100 - blink_green_car) ;
+
+  Current_trafic_time.blink_green =  ((GREEN_COLORTIME_SECOND * scale)/100) * blink_green_car ; 
+
+  Current_trafic_time.yellow_2_red = YELLOW_COLORTIME_SECOND * scale;
+
+}
+//***************************************************************************
+
+// основна функція контролів станів світлодіода
+//***************************************************************************
+uint8_t state_mashine (void){
+  static uint8_t state_mask = 0b00000001; // star position
+  static uint8_t returned_data = 0;
+  static uint32_t zero = 0;
+
+  static bool na_zero = true;
+  bool button_flag = false;
+
+  // chech button
+  if((check_button_timer.mainrtos()) ){
+
+    button_flag = digitalRead(BUTTON);
+    if((button_flag == true) && (state_mask == 0b00000100) ){
+      //Serial.printf("point_pushbutton \n");
+      na_zero = true;
+      state_mask = 0b00001000;
+    }
+
+  }
+
+  // check light sencetive
+  if(check_light_timer.mainrtos()){
+
+    if((digitalRead(LIGHT_SENSETIVE) == LOW)){
+      //Serial.printf("night \n");
+      state_mask = 0b10000000;
+    }else if((digitalRead(LIGHT_SENSETIVE) == HIGH) && state_mask == 0b10000000){ 
+      //Serial.printf("day \n");
+      state_mask = 0b00000001;
+    }
+
+  }
+  
+
+  // перевіряємо кейсом потрібну маску, 
+  switch (state_mask)
+  {
+  case 0b00000001: // red
+    /* code */
+    if(na_zero == true){
+      zero = millis();
+    }
+
+    if((millis() - zero) > Current_trafic_time.red_time){
+      state_mask <<= 1; // зміщуємо біт в масці станів на наступний
+      na_zero = true;
+
+    }else if(returned_data != 1){
+      na_zero = false;
+      returned_data = 1;
+      Serial.printf("Case_1 \n");
+    }
+
+    break;
+  case 0b00000010: // yellow_2_green
+    /* code*/
+    if(na_zero == true){
+      zero = millis();
+    }
+
+    if((millis()  - zero) > Current_trafic_time.yellow_2_green){
+      state_mask <<= 1;
+      na_zero = true;
+      
+    }else if(returned_data != 2){
+      na_zero = false;
+      returned_data = 2;
+      Serial.printf("Case_2 \n");
+    }
+    
+    break;
+  case 0b00000100: // green
+    /*code*/
+    if(na_zero == true){
+      zero = millis();
+    }
+
+    if((millis()  -zero) > Current_trafic_time.green){
+      state_mask <<= 1;
+      na_zero = true;
+      
+    }else if(returned_data != 3){
+      na_zero = false;
+      returned_data = 3;
+      Serial.printf("Case_3 \n");
+    }
+
+    break;
+  case 0b00001000: // blink green
+    /*code*/
+    if(na_zero == true){
+      zero = millis();
+    }
+
+    if((millis()  -zero) > Current_trafic_time.blink_green){
+      state_mask <<= 1;
+      na_zero = true;
+      
+    }else if(returned_data != 4){
+      na_zero = false;
+      returned_data = 4;
+      Serial.printf("Case_4 \n");
+    }
+
+    break;
+  case 0b00010000: // yellow_2_green
+    /*code*/
+    if(na_zero == true){
+      zero = millis();
+    }
+
+    if((millis()  -zero) > Current_trafic_time.yellow_2_red){
+       state_mask = 0b00000001; // встановлюємо маску в почвткове положення
+      na_zero = true;
+      
+    }else if(returned_data != 5){
+      na_zero = false;
+      returned_data = 5;
+      Serial.printf("Case_5 \n");
+    } 
+
+    break;
+  case 0b10000000:
+  /*code*/
+    if(returned_data != 0){
+      returned_data = 0;
+      na_zero = true;
+    }
+    break;
+  }
+
+
+  return returned_data;
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
