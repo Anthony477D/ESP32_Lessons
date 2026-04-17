@@ -247,10 +247,6 @@ void setup() {
 
 void loop() {
  
-  uint8_t some_trash;
-
-  //some_trash = state_mashine();
-  //Serial.printf("curent state ->%d \n",some_trash);
   release_state_color( state_mashine());
 
   people_state_color();
